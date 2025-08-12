@@ -14,6 +14,7 @@ endif()
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(rclcpp_components REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
@@ -29,8 +30,25 @@ add_executable(oxts_driver
                src/lib/NComRxC.c 
                src/driver/driver.cpp)
 
+# Add component library for composition
+add_library(oxts_driver_component SHARED
+               src/oxts_driver_component.cpp
+               src/lib/NComRxC.c 
+               src/driver/driver.cpp)
+
 ament_target_dependencies(oxts_driver 
                           rclcpp
+                          std_msgs
+                          sensor_msgs
+                          geometry_msgs
+                          nav_msgs
+                          tf2
+                          tf2_kdl
+                          oxts_msgs)
+
+ament_target_dependencies(oxts_driver_component
+                          rclcpp
+                          rclcpp_components
                           std_msgs
                           sensor_msgs
                           geometry_msgs
@@ -44,11 +62,29 @@ target_include_directories(oxts_driver PUBLIC
   PRIVATE ${Boost_INCLUDE_DIRS}
   $<INSTALL_INTERFACE:include>)
 
+target_include_directories(oxts_driver_component PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  PRIVATE ${Boost_INCLUDE_DIRS}
+  $<INSTALL_INTERFACE:include>)
+
+# Register component with pluginlib
+rclcpp_components_register_nodes(oxts_driver_component "oxts_driver::OxtsDriverComponent")
+set(node_plugins "${node_plugins}oxts_driver::OxtsDriverComponent;$<TARGET_FILE:oxts_driver_component>\n")
+
 install(TARGETS oxts_driver
-        DESTINATION lib/${PROJECT_NAME})
+  DESTINATION lib/${PROJECT_NAME})
 
 install(DIRECTORY config 
-        DESTINATION share/${PROJECT_NAME})
+  DESTINATION share/${PROJECT_NAME})
+
+install(DIRECTORY include/
+  DESTINATION include)
+
+install(TARGETS oxts_driver_component
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin
+)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
